@@ -2,6 +2,8 @@
 
 A Go client for seamless interaction with Ollama models, providing a clean interface to build Ollama-powered applications.
 
+Inspired by: https://ampcode.com/how-to-build-an-agent
+
 
 ## Features
 
