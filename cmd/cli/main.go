@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"flag"
 	"fmt"
 	"os"
 
@@ -16,13 +17,51 @@ const (
 	COLOR_BLUE  = "\033[34m"
 	COLOR_CYAN  = "\033[36m"
 	COLOR_RESET = "\033[0m"
+
+	defaultUrl   = "http://localhost:11434/api/chat"
+	defaultModel = "mistral:7b"
 )
 
+var (
+	urlFlag   string // URL to the ollama API
+	modelFlag string // Model to use for the chat
+)
+
+func init() {
+	// Define both flags with short and long versions
+	flag.StringVar(&urlFlag, "url", defaultUrl, "the URL of the ollama server")
+	flag.StringVar(&urlFlag, "u", defaultUrl, "the URL of the ollama server (shorthand)")
+
+	flag.StringVar(&modelFlag, "model", defaultModel, "the model to use; must be installed")
+	flag.StringVar(&modelFlag, "m", defaultModel, "the model to use; must be installed (shorthand)")
+
+	flag.Usage = usage
+}
+
 func main() {
+	// Parse the flags
+	flag.Parse()
+
+	// Get remaining positional arguments
+	args := flag.Args()
+
+	// Validate we have at least the "chat" subcommand
+	if len(args) < 1 || args[0] != "chat" {
+		usage()
+		os.Exit(1)
+	}
+
 	reader := bufio.NewReader(os.Stdin)
 
-	//TODO: Proper Error handling
-	chatter, _ := chat.OpenClient("http://sojourner:11434/api/chat", "mistral:7b")
+	// Create the chat client with the provided flags
+	chatter, err := chat.OpenClient(urlFlag, modelFlag)
+	if err != nil {
+		fmt.Printf("%sError creating chat client: %v%s\n", COLOR_RED, err, COLOR_RESET)
+		os.Exit(1)
+	}
+
+	fmt.Printf("%sConnected to %s using model %s%s\n", COLOR_CYAN, urlFlag, modelFlag, COLOR_RESET)
+
 	for {
 		ctx := context.TODO()
 
@@ -39,19 +78,17 @@ func main() {
 		}
 
 		for _, tool := range output.Msg.ToolCalls {
-			// TOOD: Only support\ functions for now
+			// Only support functions for now
 			t := tool["function"]
 
 			fmt.Printf("%s<calling function: %s with args: %v>%s\n", COLOR_BLUE, t.Name, t.Arguments, COLOR_RESET)
 
 			f := tools.Available[t.Name]
 			if f == nil {
-				//TODO: Cleanup
 				fmt.Printf("%stool %v not available: %v%s\n", COLOR_RED, t.Name, tools.Available, COLOR_RESET)
 				continue
 			}
 
-			//TODO: Cleanup error handling
 			tool_resp, _ := f(t.Arguments)
 			output, err = chatter.Send(ctx, tool_resp, chat.RoleTool)
 			if err != nil {
@@ -61,4 +98,15 @@ func main() {
 		}
 		fmt.Println(COLOR_CYAN+"<agent>"+COLOR_RESET, output.Msg.Content)
 	}
+}
+
+func usage() {
+	fmt.Fprintf(os.Stderr, "Usage of gollama:\n")
+	fmt.Fprintf(os.Stderr, "  gollama [options] chat\n\n")
+	fmt.Fprintf(os.Stderr, "Commands:\n")
+	fmt.Fprintf(os.Stderr, "  chat       Chat with the LLM\n\n")
+	fmt.Fprintf(os.Stderr, "Options:\n")
+	flag.PrintDefaults()
+	fmt.Fprintf(os.Stderr, "\nExample:\n")
+	fmt.Fprintf(os.Stderr, "  gollama -m llama3 -u http://localhost:11434/api/chat chat\n")
 }
