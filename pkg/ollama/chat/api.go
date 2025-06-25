@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 )
@@ -18,11 +19,11 @@ type Chat interface {
 }
 
 type ChatPrompt struct {
-	Model    string                 `json:"model"`
-	Messages []Message              `json:"messages"`
-	Stream   bool                   `json:"stream"`
-	Options  map[string]interface{} `json:"options"`
-	Tools    []Tool                 `json:"tools"`
+	Model    string         `json:"model"`
+	Messages []Message      `json:"messages"`
+	Stream   bool           `json:"stream"`
+	Options  map[string]any `json:"options"`
+	Tools    []Tool         `json:"tools"`
 }
 
 type Response struct {
@@ -36,8 +37,7 @@ type Message struct {
 }
 
 type ToolCalls struct {
-	Name string
-	//TODO: Fix me
+	Name      string
 	Arguments json.RawMessage
 }
 
@@ -104,7 +104,7 @@ func (c *client) Send(ctx context.Context, input string, role string) (Response,
 		},
 		Options: nil,
 		Tools: []Tool{{
-			//TODO pull in from the pointer receiveer
+			// TODO pull in from the pointer receiveer
 			Type: "function",
 			Function: Function{
 				Name:        "get_current_weather",
@@ -125,33 +125,31 @@ func (c *client) Send(ctx context.Context, input string, role string) (Response,
 		}},
 	}
 
-	//TODO: Fix error handling
-	b, _ := json.Marshal(gr)
+	b, err := json.Marshal(gr)
+	if err != nil {
+		return output, fmt.Errorf("unable to marshal request body: %v", err)
+	}
 	bodyReader := bytes.NewReader(b)
 
 	req, err := http.NewRequest(http.MethodPost, c.Url, bodyReader)
 	if err != nil {
-		//TODO: Fix me
-		return output, err
+		return output, fmt.Errorf("unable to create request: %v", err)
 	}
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		//TODO: Fix error handling
-		return output, err
+		return output, fmt.Errorf("unable to execute request: %v", err)
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode == 200 {
-		raw, err := io.ReadAll(res.Body)
-		if err != nil {
-			//TODO: Fix error handling
-			return output, err
+		raw, rErr := io.ReadAll(res.Body)
+		if rErr != nil {
+			return output, fmt.Errorf("unable to read response body: %v", rErr)
 		}
 		uErr := json.Unmarshal(raw, &output)
 		if uErr != nil {
-			//TODO: Fix error handling
-			return output, uErr
+			return output, fmt.Errorf("unable to unmarshal response body: %v", uErr)
 		}
 	}
 	return output, nil

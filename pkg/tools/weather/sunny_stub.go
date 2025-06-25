@@ -13,7 +13,8 @@ type arguments struct {
 func GetCurrentWeather(args json.RawMessage) (string, error) {
 
 	// This is a cool way to handle different types of
-	// arguments. It allows you to define a struct
+	// arguments. It allows you to define a struct for the configs
+    // without having to mess with passing that around. 
 	// Credit to Thorsten Ball's post https://ampcode.com/how-to-build-an-agent
 	// for this idea
 	details := arguments{}
